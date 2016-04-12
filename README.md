@@ -1,6 +1,7 @@
 Twitter bot that pulls in headlines from various news sites and outputs Markov chains using a RandomWriter. The model is stored in a Python pickle that is stored in a PostgreSQL database. A working version of this is running on https://twitter.com/RandomNews5.
 
 Requirements:
+------------
     Python dependencies listed in requirements.txt
 
     Set up a Twitter account and get your Consumer API Key and Secret, as well as an Access Token and Secret.
@@ -15,6 +16,7 @@ Requirements:
     DATABASE_URL = Your PostgreSQL Database URL
 
 Usage:
+------
     Setting up virtualenv is useful before running anything. Since 
     
     Use "pip install -r requirements.txt" to install python dependencies.
