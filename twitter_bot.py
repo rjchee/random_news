@@ -37,10 +37,11 @@ if __name__ == '__main__':
     while can_add_to_tweet(tweet, tweet_len):
         text = ""
         for ch in rw.generate_tokens():
-            text += ch + ' '
+            text += ch
             if model_name == CHARACTER_MODEL:
                 text = add_character_model(tweet, text)
             elif model_name == WORD_MODEL:
+                text += ' '
                 text = add_word_model(tweet, text)
             if not can_add_to_tweet(tweet + text, tweet_len):
                 break
