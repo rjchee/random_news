@@ -49,17 +49,15 @@ class NewsHTMLParser(HTMLParser):
 
 
 class NewsModel:
-    def __init__(self, name):
-        self.name = name
-
     @staticmethod
-    def update_model(rw, url, is_headline_tag, blacklist={}):
+    def update_models(writers, url, is_headline_tag, blacklist={}):
         def save_headline(headline):
             if "ttp://" in headline:
                 return False
             ret = headline not in blacklist
             if ret:
-                rw.train(headline)
+                for rw in writers:
+                    rw.train(headline)
             # mark headlines so they can be ignored on future runs
             blacklist[headline] = False
             return ret
@@ -81,8 +79,9 @@ class NewsModel:
         )
 
 
-    def get_news_model(self):
-        with self.get_db_conn() as conn:
+    @staticmethod
+    def get_news_model(name, level=5, strategy=randomwriter.CharacterStrategy):
+        with NewsModel.get_db_conn() as conn:
             with conn.cursor() as cur:
                 # check if our table exists
                 cur.execute("SELECT EXISTS(SELECT * FROM information_schema.tables where table_name=%s);", ('models',))
@@ -90,49 +89,56 @@ class NewsModel:
                     # our table does not exist
                     cur.execute("CREATE TABLE models (id serial PRIMARY KEY, name text NOT NULL UNIQUE, pickle bytea NOT NULL);")
                 # get the pickle from the database
-                cur.execute("SELECT pickle FROM models WHERE name=%s;", (self.name,)) 
+                cur.execute("SELECT pickle FROM models WHERE name=%s;", (name,)) 
                 res = cur.fetchone()
                 if res:
                     res = res[0].tobytes()
                     rw = RandomWriter.unpickle(res)
                 else:
-                    rw = RandomWriter(5, randomwriter.CharacterStrategy)
+                    rw = RandomWriter(level, strategy)
                     pkl = pickle.dumps(rw)
-                    cur.execute("INSERT INTO models (name, pickle) VALUES (%s, %s);", (self.name, pkl))
+                    cur.execute("INSERT INTO models (name, pickle) VALUES (%s, %s);", (name, pkl))
                     conn.commit()
                 return rw
 
 
-    def delete_news_model(self):
-        with self.get_db_conn() as conn:
+    @staticmethod
+    def delete_news_model(name):
+        with NewsModel.get_db_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM models WHERE name=%s;", (self.name,))
+                cur.execute("DELETE FROM models WHERE name=%s;", (name,))
                 cur.execute("DROP TABLE headlines;")
                 conn.commit()
 
 
-    def update_news_model(self, rw=None):
+    @staticmethod
+    def update_news_models(models):
         config = configparser.ConfigParser()
         config.read('config.ini')
         news_sites = config['NEWS']
 
-        with self.get_db_conn() as conn:
+        with NewsModel.get_db_conn() as conn:
             with conn.cursor() as cur:
-                if rw is None:
-                    rw = self.get_news_model()
                 # get blacklist table
                 cur.execute("SELECT EXISTS(SELECT * FROM information_schema.tables where table_name=%s);", ('headlines',))
                 if not cur.fetchone()[0]:
                     # our table does not exist
                     cur.execute("CREATE TABLE headlines (id serial PRIMARY KEY, headline text NOT NULL UNIQUE);")
 
-                cur.execute("SELECT headline FROM headlines;");
+                cur.execute("SELECT headline FROM headlines;")
                 last_headlines = cur.fetchall()
                 last_headlines = set(res[0] for res in last_headlines)
                 blacklist = dict.fromkeys(last_headlines, True)
 
+                if isinstance(models, str):
+                    models = {models : None}
+
+                writers = dict((NewsModel.get_news_model(name) if settings is None else NewsModel.get_news_model(name, settings[0], settings[1]), name) for name, settings in models.items())
+
                 for url, class_name in news_sites.items():
-                    print(url, self.update_model(rw, "http://" + url, NewsHTMLParser.identify_headline_class(class_name), blacklist))
+                    print(url, NewsModel.update_models(writers, "http://" + url,
+                        NewsHTMLParser.identify_headline_class(class_name),
+                        blacklist))
 
                 for headline, can_remove in blacklist.items():
                     if headline not in last_headlines:
@@ -142,10 +148,14 @@ class NewsModel:
                         cur.execute("DELETE FROM headlines WHERE headline=%s;", (headline,))
 
 
-                pkl = pickle.dumps(rw)
-                cur.execute("UPDATE models SET pickle=%s WHERE name=%s", (pkl, self.name))
+                for rw, name in writers.items():
+                    pkl = pickle.dumps(rw)
+                    cur.execute("UPDATE models SET pickle=%s WHERE name=%s", (pkl, name))
                 conn.commit()
 
 if __name__ == '__main__':
-    model = NewsModel('news_model')
-    model.update_news_model()
+    models = {
+        'news_model' : None,
+        'word_model' : (5, randomwriter.WordStrategy),
+    }
+    NewsModel.update_news_models(models)
