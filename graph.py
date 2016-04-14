@@ -1,5 +1,5 @@
-import random
 import collections
+import random
 
 
 class MarkovNode(object):

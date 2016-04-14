@@ -1,5 +1,5 @@
-from news_model import NewsModel
 from news_model import NewsHTMLParser
+from news_model import NewsModel
 
 class StubRandomWriter:
     def __init__(self):
