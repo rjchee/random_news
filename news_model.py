@@ -1,12 +1,13 @@
-from randomwriter import RandomWriter
-import randomwriter
-from html.parser import HTMLParser
-import requests
-import os
+import argparse
 import configparser
-import psycopg2
-from urllib.parse import urlparse
+from html.parser import HTMLParser
+import os
 import pickle
+import psycopg2
+import randomwriter
+from randomwriter import RandomWriter
+import requests
+from urllib.parse import urlparse
 
 class NewsHTMLParser(HTMLParser):
     """ Parses HTML from a news website, pulling out headline text """
@@ -107,7 +108,14 @@ class NewsModel:
         with NewsModel.get_db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM models WHERE name=%s;", (name,))
-                cur.execute("DROP TABLE headlines;")
+                conn.commit()
+
+
+    @staticmethod
+    def delete_headlines():
+        with NewsModel.get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DROP TABLE IF EXISTS headlines;")
                 conn.commit()
 
 
@@ -158,4 +166,19 @@ if __name__ == '__main__':
         'news_model' : None,
         'word_model' : (5, randomwriter.WordStrategy),
     }
-    NewsModel.update_news_models(models)
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='cmd')
+    update_parser = subparsers.add_parser('update')
+    update_parser.add_argument('-o', '--omit', default=[], nargs='+', choices=list(models.keys()))
+    delete_parser = subparsers.add_parser('delete')
+    delete_parser.add_argument('models', nargs='*', choices=list(models.keys()) + [[]]) # no arguments means delete headlines only
+
+    args = parser.parse_args()
+    if args.cmd == 'update':
+        for model in args.omit:
+            del models[model]
+        NewsModel.update_news_models(models)
+    elif args.cmd == 'delete':
+        for model in args.models:
+            NewsModel.delete_news_model(model)
+        NewsModel.delete_headlines()
