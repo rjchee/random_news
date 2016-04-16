@@ -6,6 +6,7 @@ import pickle
 import psycopg2
 import randomwriter
 from randomwriter import RandomWriter
+import re
 import requests
 from urllib.parse import urlparse
 
@@ -55,6 +56,9 @@ class NewsModel:
         def save_headline(headline):
             if "ttp://" in headline:
                 return False
+            endtime_match = re.match('^.*(?P<time>\\d\\d?:\\d{2} [AP]M \\wT)$', headline)
+            if endtime_match is not None: # for new york times headlines ending in the time
+                headline = headline[:len(headline) - len(endtime_match.group('time'))].strip()
             ret = headline not in blacklist
             if ret:
                 for rw in writers:
