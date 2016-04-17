@@ -168,9 +168,9 @@ if __name__ == '__main__':
     models = {}
     for name in config['MODEL_WEIGHTS']:
         if name in config['CHARACTER_MODELS']:
-            models[name] = (config['CHARACTER_MODELS'], randomwriter.CharacterStrategy)
+            models[name] = (int(config['CHARACTER_MODELS'][name]), randomwriter.CharacterStrategy)
         elif name in config['WORD_MODELS']:
-            models[name] = (config['WORD_MODELS'], randomwriter.WordStrategy)
+            models[name] = (int(config['WORD_MODELS'][name]), randomwriter.WordStrategy)
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='cmd')
     update_parser = subparsers.add_parser('update')
