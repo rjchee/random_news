@@ -1,5 +1,5 @@
 import argparse
-import configparser
+import config_reader
 from news_model import NewsModel
 import os
 import random
@@ -27,10 +27,8 @@ def add_word_model(tweet, text):
     return text
 
 if __name__ == '__main__':
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    models = dict(config['CHARACTER_MODELS'])
-    models.update(config['WORD_MODELS'])
+    config = config_reader.read_configs()
+    models = config['MODEL_WEIGHTS']
     distribution = [model for model, count in models.items() for i in range(int(count))]
     default_model = random.choice(distribution)
 

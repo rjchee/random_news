@@ -1,5 +1,5 @@
 import argparse
-import configparser
+import config_reader
 from html.parser import HTMLParser
 import os
 import pickle
@@ -125,9 +125,7 @@ class NewsModel:
 
     @staticmethod
     def update_news_models(models):
-        config = configparser.ConfigParser()
-        config.read('config.ini')
-        news_sites = config['NEWS']
+        news_sites = config_reader.read_configs()['NEWS']
 
         with NewsModel.get_db_conn() as conn:
             with conn.cursor() as cur:
@@ -166,10 +164,13 @@ class NewsModel:
                 conn.commit()
 
 if __name__ == '__main__':
-    models = {
-        'news_model' : None,
-        'word_model' : (5, randomwriter.WordStrategy),
-    }
+    config = config_reader.read_configs()
+    models = {}
+    for name in config['MODEL_WEIGHTS']:
+        if name in config['CHARACTER_MODELS']:
+            models[name] = (config['CHARACTER_MODELS'], randomwriter.CharacterStrategy)
+        elif name in config['WORD_MODELS']:
+            models[name] = (config['WORD_MODELS'], randomwriter.WordStrategy)
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='cmd')
     update_parser = subparsers.add_parser('update')
