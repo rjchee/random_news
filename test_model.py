@@ -1,5 +1,5 @@
-from news_model import NewsHTMLParser
-from news_model import NewsModel
+import argparse
+from news_model import NewsHTMLParser, NewsModel
 
 class StubRandomWriter:
     def __init__(self):
@@ -11,7 +11,12 @@ class StubRandomWriter:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('url', type=str)
+    parser.add_argument('headline_class', type=str)
+    args = parser.parse_args()
     rw = StubRandomWriter()
-    NewsModel.update_model(rw, "http://www.nytimes.com", NewsHTMLParser.identify_headline_class('story-heading'))
+    NewsModel.update_models([rw], 'http://' + args.url, NewsHTMLParser.identify_headline_class(args.headline_class))
+    print(args.url, '=', args.headline_class)
     print(rw.lst)
     print(len(rw.lst))
