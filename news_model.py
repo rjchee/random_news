@@ -177,6 +177,7 @@ if __name__ == '__main__':
     update_parser.add_argument('-o', '--omit', default=[], nargs='+', choices=list(models.keys()))
     delete_parser = subparsers.add_parser('delete')
     delete_parser.add_argument('models', nargs='*', choices=list(models.keys()) + [[]]) # no arguments means delete headlines only
+    parser.set_defaults(cmd='update', omit=[])
 
     args = parser.parse_args()
     if args.cmd == 'update':
