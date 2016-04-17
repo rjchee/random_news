@@ -1,4 +1,5 @@
 import argparse
+import configparser
 from news_model import NewsModel
 import os
 import random
@@ -26,15 +27,16 @@ def add_word_model(tweet, text):
     return text
 
 if __name__ == '__main__':
-    CHARACTER_MODEL = 'news_model'
-    WORD_MODEL = 'word_model'
-    models = [CHARACTER_MODEL, WORD_MODEL]
-    default_model = CHARACTER_MODEL
-    # default_model = random.choice(models)
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    models = dict(config['CHARACTER_MODELS'])
+    models.update(config['WORD_MODELS'])
+    distribution = [model for model, count in models.items() for i in range(int(count))]
+    default_model = random.choice(distribution)
 
     parser = argparse.ArgumentParser(description="Tweet random news")
     parser.add_argument('--notweet', action='store_true', default=False)
-    parser.add_argument('--model', default=default_model, choices=models, dest='model_name')
+    parser.add_argument('--model', default=default_model, choices=models.keys(), dest='model_name')
     args = parser.parse_args()
     print("Using", args.model_name)
     rw = NewsModel.get_news_model(args.model_name)
@@ -47,9 +49,9 @@ if __name__ == '__main__':
         text = ""
         for ch in rw.generate_tokens():
             text += ch
-            if args.model_name == CHARACTER_MODEL:
+            if args.model_name in config['CHARACTER_MODELS']:
                 text = add_character_model(tweet, text)
-            elif args.model_name == WORD_MODEL:
+            elif args.model_name in config['WORD_MODELS']:
                 text += ' '
                 text = add_word_model(tweet, text)
             if not can_add_to_tweet(tweet + text, tweet_len):
