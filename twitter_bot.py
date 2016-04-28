@@ -41,7 +41,11 @@ if __name__ == '__main__':
     if not rw.trained:
         NewsModel.update_news_models(args.model_name)
     tweet = ""
-    tweet_len = 46 + random.randint(-12, 12)
+    tweet_len = 50
+    if args.model_name in config['CHARACTER_MODELS']:
+        tweet_len = random.randint(-12, 12) + 46
+    elif args.model_name in config['WORD_MODELS']:
+        tweet_len = random.randint(-20, 20) + 60
 
     while can_add_to_tweet(tweet, tweet_len):
         text = ""
