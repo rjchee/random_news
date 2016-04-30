@@ -134,22 +134,25 @@ class NewsModel:
                 if not cur.fetchone()[0]:
                     # our table does not exist
                     cur.execute("CREATE TABLE headlines (id serial PRIMARY KEY, headline text NOT NULL UNIQUE);")
+                    conn.commit()
 
                 cur.execute("SELECT headline FROM headlines;")
                 last_headlines = cur.fetchall()
                 last_headlines = set(res[0] for res in last_headlines)
                 blacklist = dict.fromkeys(last_headlines, True)
 
-                if isinstance(models, str):
-                    models = {models : None}
+        if isinstance(models, str):
+            models = {models : None}
 
-                writers = dict((NewsModel.get_news_model(name) if settings is None else NewsModel.get_news_model(name, settings[0], settings[1]), name) for name, settings in models.items())
+        writers = dict((NewsModel.get_news_model(name) if settings is None else NewsModel.get_news_model(name, settings[0], settings[1]), name) for name, settings in models.items())
 
-                for url, class_name in news_sites.items():
-                    print(url, NewsModel.update_models(writers, "http://" + url,
-                        NewsHTMLParser.identify_headline_class(class_name),
-                        blacklist))
+        for url, class_name in news_sites.items():
+            print(url, NewsModel.update_models(writers, "http://" + url,
+                NewsHTMLParser.identify_headline_class(class_name),
+                blacklist))
 
+        with NewsModel.get_db_conn() as conn:
+            with conn.cursor() as cur:
                 for headline, can_remove in blacklist.items():
                     if headline not in last_headlines:
                         # new headline found
@@ -158,10 +161,12 @@ class NewsModel:
                         cur.execute("DELETE FROM headlines WHERE headline=%s;", (headline,))
 
 
-                for rw, name in writers.items():
-                    pkl = pickle.dumps(rw)
+        for rw, name in writers.items():
+            pkl = pickle.dumps(rw)
+            with NewsModel.get_db_conn() as conn:
+                with conn.cursor() as cur:
                     cur.execute("UPDATE models SET pickle=%s WHERE name=%s", (pkl, name))
-                conn.commit()
+                    conn.commit()
 
 if __name__ == '__main__':
     config = config_reader.read_configs()
