@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import argparse
 import config_reader
 from news_model import NewsModel

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import argparse
 import config_reader
 from html.parser import HTMLParser
@@ -70,12 +71,12 @@ class NewsModel:
         html_parser = NewsHTMLParser(save_headline, is_headline_tag)
         r = requests.get(url)
         html_parser.feed(r.text)
-        for rw in writers:
+        for rw, name in writers:
             for headline in headlines:
                 rw.train(headline)
             with NewsModel.get_db_conn() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("UPDATE models SET pickle=%s WHERE name=%s", (pkl, name))
+                    cur.execute("UPDATE models SET pickle=%s WHERE name=%s", (pickle.dumps(rw), name))
                     conn.commit()
 
         return html_parser.headline_count
@@ -156,12 +157,12 @@ class NewsModel:
         def get_writers():
             for name, settings in models.items():
                 if settings is None:
-                    yield NewsModel.get_news_model(name)
+                    yield NewsModel.get_news_model(name), name
                 else:
-                    yield NewsModel.get_news_model(name, settings[0], settings[1])
+                    yield NewsModel.get_news_model(name, settings[0], settings[1]), name
 
         for url, class_name in news_sites.items():
-            print(url, NewsModel.update_models(get_writers, "http://" + url,
+            print(url, NewsModel.update_models(get_writers(), "http://" + url,
                 NewsHTMLParser.identify_headline_class(class_name),
                 blacklist))
 
