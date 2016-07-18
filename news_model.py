@@ -174,6 +174,7 @@ class NewsModel:
                         cur.execute("INSERT INTO headlines (headline) VALUES (%s);", (headline,))
                     elif can_remove:
                         cur.execute("DELETE FROM headlines WHERE headline=%s;", (headline,))
+                conn.commit()
 
 
 if __name__ == '__main__':
