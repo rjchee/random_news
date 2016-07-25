@@ -53,32 +53,40 @@ class NewsHTMLParser(HTMLParser):
 
 
 class NewsModel:
-    @staticmethod
-    def update_model(writer, url, is_headline_tag, blacklist={}):
-        headlines = []
-        endtime_re  = re.compile('^.*(?P<time>\\d\\d?:\\d{2} [AP]M \\wT)$')
-        def save_headline(headline):
-            if "ttp://" in headline:
-                return False
-            endtime_match = endtime_re.match(headline)
-            if endtime_match is not None: # for new york times headlines ending in the time
-                headline = headline[:len(headline) - len(endtime_match.group('time'))].strip()
-            ret = headline not in blacklist
-            if ret:
-                headlines.append(headline)
-            # mark headlines so they can be ignored on future runs
-            blacklist[headline] = False
-            return ret
-        html_parser = NewsHTMLParser(save_headline, is_headline_tag)
-        r = requests.get(url)
-        html_parser.feed(r.text)
+    def __init__(self):
+        self.urlmap = {}
+
+
+    def update_model(self, writer, url, is_headline_tag, blacklist={}):
+        if url in self.urlmap:
+            headlines, count = self.urlmap[url]
+        else:
+            headlines = []
+            endtime_re  = re.compile('^.*(?P<time>\\d\\d?:\\d{2} [AP]M \\wT)$')
+            def save_headline(headline):
+                if "ttp://" in headline:
+                    return False
+                endtime_match = endtime_re.match(headline)
+                if endtime_match is not None: # for new york times headlines ending in the time
+                    headline = headline[:len(headline) - len(endtime_match.group('time'))].strip()
+                ret = headline not in blacklist
+                if ret:
+                    headlines.append(headline)
+                # mark headlines so they can be ignored on future runs
+                blacklist[headline] = False
+                return ret
+            html_parser = NewsHTMLParser(save_headline, is_headline_tag)
+            r = requests.get(url)
+            html_parser.feed(r.text)
+            count = html_parser.headline_count
+            self.urlmap[url] = (headlines, count)
+
         for headline in headlines:
-            rw.train(headline)
-        return html_parser.headline_count
+            writer.train(headline)
+        return count
 
 
-    @staticmethod
-    def get_db_conn():
+    def get_db_conn(self):
         url = urlparse(os.environ['DATABASE_URL'])
         return psycopg2.connect(
             database=url.path[1:],
@@ -89,9 +97,8 @@ class NewsModel:
         )
 
 
-    @staticmethod
-    def get_news_model(name, level=5, strategy=randomwriter.CharacterStrategy):
-        with NewsModel.get_db_conn() as conn:
+    def get_news_model(self, name, level=5, strategy=randomwriter.CharacterStrategy):
+        with self.get_db_conn() as conn:
             with conn.cursor() as cur:
                 # check if our table exists
                 cur.execute("SELECT EXISTS(SELECT * FROM information_schema.tables where table_name=%s);", ('models',))
@@ -111,25 +118,22 @@ class NewsModel:
                 return rw
 
 
-    @staticmethod
-    def delete_news_model(name):
-        with NewsModel.get_db_conn() as conn:
+    def delete_news_model(self, name):
+        with self.get_db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM models WHERE name=%s;", (name,))
 
 
-    @staticmethod
-    def delete_headlines():
-        with NewsModel.get_db_conn() as conn:
+    def delete_headlines(self):
+        with self.get_db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("DROP TABLE IF EXISTS headlines;")
 
 
-    @staticmethod
-    def update_news_models(models):
+    def update_news_models(self, models):
         news_sites = config_reader.read_configs()['NEWS']
 
-        with NewsModel.get_db_conn() as conn:
+        with self.get_db_conn() as conn:
             with conn.cursor() as cur:
                 # get blacklist table
                 cur.execute("SELECT EXISTS(SELECT * FROM information_schema.tables where table_name=%s);", ('headlines',))
@@ -146,24 +150,22 @@ class NewsModel:
 
         output = Counter()
         for name, settings in models.items():
-            model = NewsModel.get_news_model(name) if settings is None else NewsModel.get_news_model(name, settings[0], settings[1])
+            model = self.get_news_model(name) if settings is None else self.get_news_model(name, settings[0], settings[1])
             for url, class_name in news_sites.items():
-                output[url] += NewsModel.update_model(model, "http://" + url, NewsHTMLParser.identify_headline_class(class_name), blacklist)
-            with NewsModel.get_db_conn() as conn:
+                output[url] += self.update_model(model, "http://" + url, NewsHTMLParser.identify_headline_class(class_name), blacklist)
+            with self.get_db_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute("UPDATE models SET pickle=%s WHERE name=%s", (pickle.dumps(model), name))
 
         for url, count in output.items():
             print(url, count)
 
-        with NewsModel.get_db_conn() as conn:
+        with self.get_db_conn() as conn:
             with conn.cursor() as cur:
+                cur.execute("TRUNCATE headlines;")
                 for headline, can_remove in blacklist.items():
-                    if headline not in last_headlines:
-                        # new headline found
+                    if not can_remove:
                         cur.execute("INSERT INTO headlines (headline) VALUES (%s);", (headline,))
-                    elif can_remove:
-                        cur.execute("DELETE FROM headlines WHERE headline=%s;", (headline,))
 
 
 if __name__ == '__main__':
@@ -183,11 +185,12 @@ if __name__ == '__main__':
     parser.set_defaults(cmd='update', omit=[])
 
     args = parser.parse_args()
+    news_model = NewsModel()
     if args.cmd == 'update':
         for model in args.omit:
             del models[model]
-        NewsModel.update_news_models(models)
+        news_model.update_news_models(models)
     elif args.cmd == 'delete':
         for model in args.models:
-            NewsModel.delete_news_model(model)
-        NewsModel.delete_headlines()
+            news_model.delete_news_model(model)
+        news_model.delete_headlines()
