@@ -175,7 +175,7 @@ class NewsModel(object):
             if settings is None:
                 model = self.get_news_model(name)
             else:
-                self.get_news_model(name, settings[0], settings[1])
+                model = self.get_news_model(name, settings[0], settings[1])
             for url, class_name in news_sites.items():
                 # counts should never differ, so just save it each time
                 output[url] = self.update_model(model, "http://" + url,
