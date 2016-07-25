@@ -139,7 +139,7 @@ class NewsModel:
 
                 cur.execute("SELECT headline FROM headlines;")
                 last_headlines = cur.fetchall()
-                blacklist = dict.fromkeys(res[0] for res in last_headlines, True)
+                blacklist = dict.fromkeys((res[0] for res in last_headlines), True)
 
         if isinstance(models, str):
             models = {models : None}
