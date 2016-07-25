@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+from collections import Counter
 import config_reader
 from html.parser import HTMLParser
 import os
@@ -53,7 +54,7 @@ class NewsHTMLParser(HTMLParser):
 
 class NewsModel:
     @staticmethod
-    def update_models(writers, url, is_headline_tag, blacklist={}):
+    def update_model(writer, url, is_headline_tag, blacklist={}):
         headlines = []
         endtime_re  = re.compile('^.*(?P<time>\\d\\d?:\\d{2} [AP]M \\wT)$')
         def save_headline(headline):
@@ -71,13 +72,8 @@ class NewsModel:
         html_parser = NewsHTMLParser(save_headline, is_headline_tag)
         r = requests.get(url)
         html_parser.feed(r.text)
-        for rw, name in writers:
-            for headline in headlines:
-                rw.train(headline)
-            with NewsModel.get_db_conn() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("UPDATE models SET pickle=%s WHERE name=%s", (pickle.dumps(rw), name))
-
+        for headline in headlines:
+            rw.train(headline)
         return html_parser.headline_count
 
 
@@ -143,23 +139,22 @@ class NewsModel:
 
                 cur.execute("SELECT headline FROM headlines;")
                 last_headlines = cur.fetchall()
-                last_headlines = set(res[0] for res in last_headlines)
-                blacklist = dict.fromkeys(last_headlines, True)
+                blacklist = dict.fromkeys(res[0] for res in last_headlines, True)
 
         if isinstance(models, str):
             models = {models : None}
 
-        def get_writers():
-            for name, settings in models.items():
-                if settings is None:
-                    yield NewsModel.get_news_model(name), name
-                else:
-                    yield NewsModel.get_news_model(name, settings[0], settings[1]), name
+        output = Counter()
+        for name, settings in models.items():
+            model = NewsModel.get_news_model(name) if settings is None else NewsModel.get_news_model(name, settings[0], settings[1])
+            for url, class_name in news_sites.items():
+                output[url] += NewsModel.update_model(model, "http://" + url, NewsHTMLParser.identify_headline_class(class_name), blacklist)
+            with NewsModel.get_db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("UPDATE models SET pickle=%s WHERE name=%s", (pickle.dumps(model), name))
 
-        for url, class_name in news_sites.items():
-            print(url, NewsModel.update_models(get_writers(), "http://" + url,
-                NewsHTMLParser.identify_headline_class(class_name),
-                blacklist))
+        for url, count in output.items():
+            print(url, count)
 
         with NewsModel.get_db_conn() as conn:
             with conn.cursor() as cur:
