@@ -77,7 +77,6 @@ class NewsModel:
             with NewsModel.get_db_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute("UPDATE models SET pickle=%s WHERE name=%s", (pickle.dumps(rw), name))
-                    conn.commit()
 
         return html_parser.headline_count
 
@@ -113,7 +112,6 @@ class NewsModel:
                     rw = RandomWriter(level, strategy)
                     pkl = pickle.dumps(rw)
                     cur.execute("INSERT INTO models (name, pickle) VALUES (%s, %s);", (name, pkl))
-                    conn.commit()
                 return rw
 
 
@@ -122,7 +120,6 @@ class NewsModel:
         with NewsModel.get_db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM models WHERE name=%s;", (name,))
-                conn.commit()
 
 
     @staticmethod
@@ -130,7 +127,6 @@ class NewsModel:
         with NewsModel.get_db_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute("DROP TABLE IF EXISTS headlines;")
-                conn.commit()
 
 
     @staticmethod
@@ -144,7 +140,6 @@ class NewsModel:
                 if not cur.fetchone()[0]:
                     # our table does not exist
                     cur.execute("CREATE TABLE headlines (id serial PRIMARY KEY, headline text NOT NULL UNIQUE);")
-                    conn.commit()
 
                 cur.execute("SELECT headline FROM headlines;")
                 last_headlines = cur.fetchall()
@@ -174,7 +169,6 @@ class NewsModel:
                         cur.execute("INSERT INTO headlines (headline) VALUES (%s);", (headline,))
                     elif can_remove:
                         cur.execute("DELETE FROM headlines WHERE headline=%s;", (headline,))
-                conn.commit()
 
 
 if __name__ == '__main__':
