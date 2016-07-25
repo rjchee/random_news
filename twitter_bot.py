@@ -38,9 +38,10 @@ if __name__ == '__main__':
     parser.add_argument('--model', default=default_model, choices=models.keys(), dest='model_name')
     args = parser.parse_args()
     print("Using", args.model_name)
-    rw = NewsModel.get_news_model(args.model_name)
+    model = NewsModel()
+    rw = model.get_news_model(args.model_name)
     if not rw.trained:
-        NewsModel.update_news_models(args.model_name)
+        model.update_news_models(args.model_name)
     tweet = ""
     tweet_len = 50
     if args.model_name in config['CHARACTER_MODELS']:
