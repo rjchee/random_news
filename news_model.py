@@ -239,9 +239,11 @@ def __main():
             del models[model]
         news_model.update_news_models(models)
     elif args.cmd == 'delete':
-        if args.model:
+        if args.models:
             for model in args.models:
+                print("deleting model", model)
                 news_model.delete_news_model(model)
+                print("done")
         else:
             news_model.delete_headlines()
 
