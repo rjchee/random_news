@@ -16,6 +16,15 @@ class MarkovNode(object):
         self.count += 1
 
 
+    def decrement(self, token):
+        if self.neighbors[token] <= 0:
+            return
+        self.neighbors[token] -= 1
+        if not self.neighbors[token]:
+            del self.neighbors[token]
+        self.count -= 1
+
+
     def get_random_key(self):
         if self.count <= 0:
             return None
@@ -52,6 +61,20 @@ class MarkovGraph(object):
                 last_k.append(token)
 
 
+    def untrain(self, tokens):
+        if self._k == 0:
+            for token in tokens:
+                self._root.decrement(token)
+        else:
+            last_k = collections.deque(maxlen=self._k)
+            for token in tokens:
+                if len(last_k) == self._k:
+                    key = tuple(last_k)
+                    self._nodes[key].decrement(token)
+                    self._root.decrement(key)
+                last_k.append(token)
+
+
     def generate_tokens(self):
         if self._k == 0:
             key = self._root.get_random_key()
@@ -70,3 +93,7 @@ class MarkovGraph(object):
                     return
                 yield next_tk
                 tokens = tokens[1:] + (next_tk,)
+
+
+    def count(self):
+        return self._root.count

@@ -4,6 +4,7 @@ This module contains logic to update a RandomWriter object from news headlines
 pulled from the internet.
 """
 import argparse
+from datetime import datetime
 from html.parser import HTMLParser
 import os
 import pickle
@@ -62,14 +63,21 @@ class NewsHTMLParser(HTMLParser):
 
 class NewsModel(object):
     """ This class contains logic to access the PostgreSQL database on news models """
+
+
     def __init__(self):
         self.urlmap = {}
 
 
-    def update_model(self, writer, url, is_headline_tag, blacklist=None):
+    def update_model(self, writer, url, is_headline_tag, old_headlines, new_headlines, blacklist=None):
         """ Update a single model with the URL and other parameters """
+        if not hasattr(self, 'window'):
+            print("please update the news model through news_model.py")
+            return
+        # we don't make blacklist a set() by default at the top because the set
+        # is mutable and is instantiated when the module is loaded
         if blacklist is None:
-            blacklist = {}
+            blacklist = set()
         if url in self.urlmap:
             headlines, count = self.urlmap[url]
         else:
@@ -82,11 +90,10 @@ class NewsModel(object):
                 endtime_match = endtime_re.match(headline)
                 if endtime_match is not None: # for new york times headlines ending in the time
                     headline = headline[:len(headline) - len(endtime_match.group('time'))].strip()
-                ret = headline not in blacklist
+                ret = headline not in blacklist and headline.strip()
                 if ret:
                     headlines.append(headline)
-                # mark headlines so they can be ignored on future runs
-                blacklist[headline] = False
+                    new_headlines.add(headline)
                 return ret
             html_parser = NewsHTMLParser(save_headline, is_headline_tag)
             html_page = requests.get(url)
@@ -96,6 +103,8 @@ class NewsModel(object):
 
         for headline in headlines:
             writer.train(headline)
+        for headline in old_headlines:
+            writer.untrain(headline)
         return count
 
 
@@ -112,7 +121,7 @@ class NewsModel(object):
         )
 
 
-    def get_news_model(self, name, level=5, strategy=randomwriter.CharacterStrategy):
+    def get_randomwriter(self, name, level=5, strategy=randomwriter.CharacterStrategy):
         """ Retrieve a news model from the database """
         with self.get_db_conn() as conn:
             with conn.cursor() as cur:
@@ -152,25 +161,32 @@ class NewsModel(object):
 
     def update_news_models(self, models):
         """ Update a list of models with headlines pulled from the websites in the config """
+        if not hasattr(self, 'window'):
+            print("please update the news model through news_model.py")
+            return
         news_sites = config_reader.read_configs()['NEWS']
 
         with self.get_db_conn() as conn:
             with conn.cursor() as cur:
-                # get blacklist table
+                # get table of already used headlines
                 cur.execute("SELECT EXISTS(SELECT * FROM information_schema.tables"
                             + " where table_name=%s);", ('headlines',))
                 if not cur.fetchone()[0]:
                     # our table does not exist
                     cur.execute("CREATE TABLE headlines (id serial PRIMARY KEY,"
-                                + " headline text NOT NULL UNIQUE);")
+                                + " headline text NOT NULL UNIQUE,"
+                                + " date_added date);")
 
                 cur.execute("SELECT headline FROM headlines;")
-                blacklist = dict.fromkeys((res[0] for res in cur), True)
+                blacklist = set(res[0] for res in cur)
+                cur.execute("SELECT headline FROM headlines WHERE date_added < now() - interval '%s days';", (self.window,))
+                old_headlines = set(res[0] for res in cur)
 
         if isinstance(models, str):
             models = {models : None}
 
         output = {}
+        new_headlines = set()
         for name, settings in models.items():
             if settings is None:
                 model = self.get_news_model(name)
@@ -180,7 +196,7 @@ class NewsModel(object):
                 # counts should never differ, so just save it each time
                 output[url] = self.update_model(model, "http://" + url,
                                                 NewsHTMLParser.identify_headline_class(class_name),
-                                                blacklist)
+                                                old_headlines, new_headlines, blacklist)
             with self.get_db_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute("UPDATE models SET pickle=%s WHERE name=%s",
@@ -189,12 +205,12 @@ class NewsModel(object):
         for url, count in output.items():
             print(url, count)
 
+        # clear out old headlines and add new ones
         with self.get_db_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("TRUNCATE headlines;")
-                for headline, can_remove in blacklist.items():
-                    if not can_remove:
-                        cur.execute("INSERT INTO headlines (headline) VALUES (%s);", (headline,))
+                cur.execute("DELETE FROM headlines WHERE date_added < now() - interval '%s days';", (self.window,))
+                for headline in new_headlines:
+                    cur.execute("INSERT INTO headlines (headline, date_added) VALUES (%s, %s);", (headline, datetime.now()))
 
 
 def __main():
@@ -217,14 +233,17 @@ def __main():
 
     args = parser.parse_args()
     news_model = NewsModel()
+    news_model.window = int(config['DB']['window'])
     if args.cmd == 'update':
         for model in args.omit:
             del models[model]
         news_model.update_news_models(models)
     elif args.cmd == 'delete':
-        for model in args.models:
-            news_model.delete_news_model(model)
-        news_model.delete_headlines()
+        if args.model:
+            for model in args.models:
+                news_model.delete_news_model(model)
+        else:
+            news_model.delete_headlines()
 
 
 if __name__ == '__main__':

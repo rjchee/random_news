@@ -25,7 +25,7 @@ class RandomWriter(object):
     """A Markov chain based random data generator."""
 
 
-    class_version = 1.0
+    class_version = 1.1
     def __init__(self, level, strategy):
         self.version = self.__class__.class_version
         self._level = level
@@ -56,6 +56,9 @@ class RandomWriter(object):
             self.version = 1.0
             if hasattr(self, 'tokenization'):
                 del self.tokenization
+        if self.version < 1.1:
+            self.version = 1.1
+            self.trained = self._graph.count() > 0
 
 
     def train(self, data):
@@ -63,4 +66,12 @@ class RandomWriter(object):
         if not isinstance(data, str):
             raise TypeError("Training expects string data!")
         self._graph.train(self._strategy.tokenize(data))
-        self.trained = True
+        self.trained = self._graph.count() > 0
+
+
+    def untrain(self, data):
+        """Remove instances of trained data from graph"""
+        if not isinstance(data, str):
+            raise TypeError("Training expects string data!")
+        self._graph.untrain(self._strategy.tokenize(data))
+        self.trained = self._graph.count() > 0
