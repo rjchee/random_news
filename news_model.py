@@ -121,7 +121,7 @@ class NewsModel(object):
         )
 
 
-    def get_randomwriter(self, name, level=5, strategy=randomwriter.CharacterStrategy):
+    def get_news_model(self, name, level=5, strategy=randomwriter.CharacterStrategy):
         """ Retrieve a news model from the database """
         with self.get_db_conn() as conn:
             with conn.cursor() as cur:
