@@ -25,6 +25,10 @@ class MarkovNode(object):
         self.count -= 1
 
 
+    def __len__(self):
+        return self.count
+
+
     def get_random_key(self):
         if self.count <= 0:
             return None
@@ -70,8 +74,13 @@ class MarkovGraph(object):
             for token in tokens:
                 if len(last_k) == self._k:
                     key = tuple(last_k)
-                    self._nodes[key].decrement(token)
-                    self._root.decrement(key)
+                    if key in self._nodes:
+                        self._nodes[key].decrement(token)
+                        if not self._nodes[key]:
+                            del self._nodes[key]
+                        self._root.decrement(key)
+                    else:
+                        print("key '{}' not found".format(key), file=sys.stderr)
                 last_k.append(token)
 
 
