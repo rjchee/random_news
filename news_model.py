@@ -217,7 +217,7 @@ class NewsModel(object):
                 num_headlines = next(cur)[0]
                 remove_headlines = num_headlines - int(conf['DB']['max_headlines'])
                 if remove_headlines > 0:
-                    cur.execute("DELETE FROM headlines WHERE ctid IN (SELECT ctid FROM headlines ORDER BY date_added) LIMIT %s", (remove_headlines,))
+                    cur.execute("DELETE FROM headlines WHERE ctid IN (SELECT ctid FROM headlines ORDER BY date_added, id) LIMIT %s", (remove_headlines,))
                     print("Deleting {} headlines due to too many rows".format(remove_headlines))
 
 
