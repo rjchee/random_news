@@ -159,12 +159,14 @@ class NewsModel(object):
                 cur.execute("TRUNCATE headlines;")
 
 
-    def update_news_models(self, models):
+    def update_news_models(self, models, conf=None):
         """ Update a list of models with headlines pulled from the websites in the config """
         if not hasattr(self, 'window'):
             print("please update the news model through news_model.py")
             return
-        news_sites = config_reader.read_configs()['NEWS']
+        if conf is None:
+            conf = config_reader.read_configs()
+        news_sites = conf['NEWS']
 
         with self.get_db_conn() as conn:
             with conn.cursor() as cur:
@@ -211,6 +213,11 @@ class NewsModel(object):
                 cur.execute("DELETE FROM headlines WHERE date_added < now() - interval '%s days';", (self.window,))
                 for headline in new_headlines:
                     cur.execute("INSERT INTO headlines (headline, date_added) VALUES (%s, %s);", (headline, datetime.now()))
+                num_headlines = next(cur.execute("SELECT COUNT(headline) FROM headlines;"))[0]
+                remove_headlines = num_headlines - int(conf['DB']['max_headlines'])
+                if remove_headlines > 0:
+                    cur.execute("DELETE FROM headlines WHERE ctid IN (SELECT ctid FROM headlines ORDER BY date_added) LIMIT %s", (remove_headlines,))
+                    print("Deleting {} headlines due to too many rows".format(remove_headlines))
 
 
 def __main():
@@ -237,7 +244,7 @@ def __main():
     if args.cmd == 'update':
         for model in args.omit:
             del models[model]
-        news_model.update_news_models(models)
+        news_model.update_news_models(models, config)
     elif args.cmd == 'delete':
         if args.models:
             for model in args.models:
