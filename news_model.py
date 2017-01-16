@@ -213,7 +213,8 @@ class NewsModel(object):
                 cur.execute("DELETE FROM headlines WHERE date_added < now() - interval '%s days';", (self.window,))
                 for headline in new_headlines:
                     cur.execute("INSERT INTO headlines (headline, date_added) VALUES (%s, %s);", (headline, datetime.now()))
-                num_headlines = next(cur.execute("SELECT COUNT(headline) FROM headlines;"))[0]
+                cur.execute("SELECT COUNT(headline) FROM headlines;")
+                num_headlines = next(cur)[0]
                 remove_headlines = num_headlines - int(conf['DB']['max_headlines'])
                 if remove_headlines > 0:
                     cur.execute("DELETE FROM headlines WHERE ctid IN (SELECT ctid FROM headlines ORDER BY date_added) LIMIT %s", (remove_headlines,))
