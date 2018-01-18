@@ -7,7 +7,7 @@ import random
 from twython import Twython
 
 def can_add_to_tweet(tweet, tweet_len):
-    return len(tweet.strip()) < tweet_len or len(tweet) < 100 and tweet[-1] not in ".,?! "
+    return len(tweet.strip()) < tweet_len or len(tweet) < 240 and tweet[-1] not in ".,?! "
 
 def add_character_model(tweet, text):
     if (not tweet or tweet[-1] == ' ') and not (text[0].isupper() or text[0].isdigit()):
