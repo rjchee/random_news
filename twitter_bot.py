@@ -10,7 +10,7 @@ from twython import Twython
 punc = set(string.punctuation)
 
 def can_add_to_tweet(tweet, tweet_len):
-    return len(tweet.strip()) < tweet_len or len(tweet) < 240 and tweet[-1] not in punc
+    return len(tweet.strip()) < tweet_len or len(tweet) < 160 and tweet[-1] not in punc
 
 def add_character_model(tweet, text):
     if (not tweet or tweet[-1] == ' ') and not (text[0].isupper() or text[0].isdigit()):
